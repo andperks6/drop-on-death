@@ -1,7 +1,5 @@
 Scriptname onmoQuestScript extends Quest  
 
-
-
 Event OnInit()
     HiggsVR.RegisterForPullEvent(Game.GetForm(GetFormID()))
     HiggsVR.RegisterForGrabEvent(Game.GetForm(GetFormID()))

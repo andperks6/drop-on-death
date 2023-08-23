@@ -1,5 +1,7 @@
 scriptname onmoMCMScript extends SKI_ConfigBase
 
+int property version = 2 auto
+
 ; Despawning:
 Int despawnModeMenu
 string[] despawnModeOptions
@@ -32,8 +34,6 @@ float Property CurrentFlickerAmount = 30.0  auto
 Int returnDistanceSlider
 float Property CurrentReturnDistance = 600.0  auto
 
-
-
 Int returnModeMenu
 string[] returnModeOptions
 Int Property CurrentReturnMode = 0  auto
@@ -55,10 +55,15 @@ Bool manualDespawnValue
 Int stopEffectsToggle
 Bool stopEffectsValue
 
+Int debugToggle
+Bool Property inDebugMode = false auto
+
 Int returnIntervalSlider
 float Property CurrentReturnInterval = 10.0  auto
 
 event OnConfigInit()
+
+
 		Pages = new string[3]
 		Pages[0] = "Settings"
 		Pages[1] = "Filters"
@@ -117,6 +122,8 @@ event OnConfigInit()
         filterNames[7] = "Potion"
         filterNames[8] = "Coins"
         filterNames[9] = "Ingredient"
+        
+        
 endEvent
 
 
@@ -193,7 +200,11 @@ Event OnPageReset(string page)
 		manualDespawnToggle = AddToggleOption("Manual Despawn", manualDespawnValue)
 		stopEffectsValue = False;
 		stopEffectsToggle = AddToggleOption("Remove visual effects of items", stopEffectsValue)
-		AddEmptyOption()
+		
+        
+		debugToggle = AddToggleOption("Debug mode", inDebugMode)
+        
+        AddEmptyOption()
 		
 		AddHeaderOption("Advanced")
 		
@@ -316,6 +327,9 @@ event OnOptionSelect(int option)
     elseIf (option == stopEffectsToggle)
 		stopEffectsValue = !stopEffectsValue
 		SetToggleOptionValue(option, stopEffectsValue)
+    elseIf (option == debugToggle)
+		inDebugMode = !inDebugMode
+		SetToggleOptionValue(option, inDebugMode)
     elseIf (option == flickerEnabledToggle)
 		CurrentFlickerEnabled = !CurrentFlickerEnabled
 		SetToggleOptionValue(option, CurrentFlickerEnabled)
@@ -371,12 +385,17 @@ event OnOptionHighlight(int option)
 		SetInfoText("Removes all visual effects from items.")
 	elseif (option == manualDespawnToggle)
 		SetInfoText("Button to manually despawn dropped items.")
+    elseif (option == debugToggle)
+		SetInfoText("Enables debug mode")
 	endIf
 endEvent
 
 event OnConfigClose()
 	if (stopScriptValue)
 		SendModEvent("onmoStopScriptEvent")
+	endIf
+    if (inDebugMode)
+		debug.notification("Enabled debug mode")
 	endIf
     if (stopEffectsValue)
 		SendModEvent("onmoStopEffectsEvent")

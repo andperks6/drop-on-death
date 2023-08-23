@@ -7,13 +7,16 @@ int[] itemCounts
 onmoMCMScript property mcm auto
 string purseID = ""
 
+int version
+
 Actor Property player Auto
-
-
 
 Activator Property onmoEffectMarker Auto
 Flora Property onmoCoinPurse  Auto 
 MiscObject Property Gold001  Auto
+
+
+string debugPrefix = ""
 
 ; Custom event from MCM
 Event onStopScript(string eventName, string strArg, float numArg, Form sender)
@@ -31,57 +34,89 @@ EndEvent
 Event OnInit()
 	RegisterForModEvent("onmoStopScriptEvent", "onStopScript")
 	RegisterForModEvent("onmoManualDespawnEvent", "onManualDespawn")
+    version = mcm.version
 EndEvent
 
 Event OnEffectStart(Actor akTarget, Actor akCaster)
 	target = akTarget
+    
 	GoToState("alive")
 EndEvent
+
+    ObjectReference Function placePurse(int coinCount)
+        ObjectReference purse = target.PlaceAtMe(onmoCoinPurse, 1, false, true) ; Create custom coin purse with script
+        (purse as onmoCoinPurseScript).amount = coinCount ; Give coin purse the amount of coin
+        purse.SetPosition(target.GetPositionX(), target.GetPositionY(), target.GetPositionZ()+50) ; Move coin purse to on top of corpse
+        purse.SetActorOwner(NONE)
+        (purse as onmoCoinPurseScript).startPurse()
+        purse.Enable() ; Make purse visible
+        purseID = purse.GetFormID()+""
+        return purse
+    EndFunction
+    
+    Function placeMarker(ObjectReference droppedItem, int itemCount)
+        ObjectReference marker = target.placeAtMe(onmoEffectMarker,1)
+        (marker as onmoEffectMarkerScript).item = droppedItem as ObjectReference
+        (marker as onmoEffectMarkerScript).itemCount = itemCount
+        (marker as onmoEffectMarkerScript).startEffect()
+    EndFunction
+    
 
 
 State alive
 
+   
 	Event OnDying(Actor akKiller)
+    
+        debugPrefix = "DropOnDeath debug: [" + target.getFormID() + ", " + target.getBaseObject().getName() + "] - "
+        
+        if (mcm.inDebugMode)
+            debug.trace(debugPrefix + "is dying. Trying to drop inventory")
+            debug.notification(target.getBaseObject().getName() + " is dying. Dropping inventory")
+        endIF
+       
+    
 		despawnMode = mcm.CurrentDespawnMode
 		despawnCondition = mcm.CurrentDespawnCondition
         
         Form[] inventory = PO3_SKSEFunctions.AddAllItemsToArray(target, false, false, true) ; For filtering quest items
+        
+       
+        
         itemCounts = Utility.CreateIntArray(inventory.length); Int array of the calculated needed size
         items = Utility.CreateFormArray(inventory.length); Array of dropped items
+        
+        
 		int index = items.length
 		While (index > 0)
 			index -= 1
 			Form item = inventory[index]
+            int itemCount = target.GetItemCount(item)
             ; Checks if item is not none, is playable, is not equipped OR an equipped weapon, is allowed to drop in MCM
-			if (item != NONE && item.IsPlayable() && (!target.IsEquipped(item) || (target.GetEquippedWeapon() != NONE && target.GetEquippedWeapon().GetFormID() == item.GetFormID())) && checkDropToggles(item))
-				int itemCount = target.GetItemCount(item)
+			if (item != NONE && item.IsPlayable() && (!target.IsEquipped(item) || (target.GetEquippedWeapon() != NONE && target.GetEquippedWeapon().GetFormID() == item.GetFormID())) && checkDropToggles(item) && itemCount > 0)
+				
 				ObjectReference droppedItem = NONE
-				if (item.GetFormID() == 15) ; If item is coins and coindrops are enabled in mcm
+				if (item.GetFormID() == 15 && itemCount > 0) ; If item is coins and coindrops are enabled in mcm
 					target.RemoveItem(Gold001, itemCount, true) ; remove the coins from inv
-					ObjectReference purse = target.PlaceAtMe(onmoCoinPurse, 1, false, true) ; Create custom coin purse with script
-					(purse as onmoCoinPurseScript).amount = itemCount ; Give coin purse the amount of coin
-					purse.SetPosition(target.GetPositionX(), target.GetPositionY(), target.GetPositionZ()+50) ; Move coin purse to on top of corpse
-					purse.SetActorOwner(NONE)
-					(purse as onmoCoinPurseScript).startPurse()
-					purse.Enable() ; Make purse visible
-					droppedItem = purse
-					purseID = purse.GetFormID()+""
+                    droppedItem = placePurse(itemCount)
+                    if (mcm.inDebugMode)
+                        debug.trace(debugPrefix + "Dropped item is a coin purse")
+                    endIF
 				else
 					droppedItem = target.DropObject(item,itemCount)
+                    if (mcm.inDebugMode)
+                        debug.trace(debugPrefix + "Dropped item is an item with formID: " + droppedItem.getFormID())
+                    endIF
 				endIf
-				if (droppedItem != NONE && (droppedItem.Is3DLoaded() || !droppedItem.Is3DLoaded()))
-					waitFor3D(droppedItem)
                 
-					items[index] = droppedItem
-					itemCounts[index] = itemCount
-					
-					if(mcm.CurrentFlickerEnabled)
-						ObjectReference marker = target.placeAtMe(onmoEffectMarker,1)
-						(marker as onmoEffectMarkerScript).item = droppedItem as ObjectReference
-						(marker as onmoEffectMarkerScript).itemCount = itemCount
-						(marker as onmoEffectMarkerScript).startEffect()
-					endIF
-				endIF
+                waitFor3D(droppedItem)
+                
+                items[index] = droppedItem
+                itemCounts[index] = itemCount
+                
+                if(mcm.CurrentFlickerEnabled)
+                    placeMarker(droppedItem, itemCount)
+                endIF
 			endIf
 		EndWhile
 		GoToState("dead")
@@ -106,7 +141,9 @@ EndState
 
     ;Waits for 3d to be loaded, with a max time of 10 seconds
     bool Function waitFor3D(ObjectReference item)
-        
+        if (item == NONE)
+            return false
+        endIf
         int effectIndex = 0
         while(!item.Is3DLoaded() && effectIndex < 50)
             Utility.Wait(0.1)

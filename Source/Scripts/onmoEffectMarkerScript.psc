@@ -35,41 +35,37 @@ Event onInit()
 endEvent
 
 Event onStopEffect(string eventName, string arg, float numArg, Form sender)
+    unregisterAll()
+EndEvent
+
+Function startEffect()
+    RegisterForSingleUpdate(0.1)
+    enable()
+endFunction
+
+Function unregisterAll()
     delete()
     UnregisterForUpdate()
     UnregisterForUpdateGameTime()
     UnregisterForAllModEvents()
     goToState("gone")
-EndEvent
-
-Function startEffect()
-    RegisterForSingleUpdate(0.2)
-    enable()
 endFunction
 
-
 Event onItemReady(string eventName, string arg, float numArg, Form sender)
-    RegisterForSingleUpdate(0.2)
+    RegisterForSingleUpdate(0.1)
     enable()
 EndEvent
 
 Event OnUpdate()
-    if(item != NONE)
-        if (item.GetPositionX())
-            SetPosition(item.GetPositionX(), item.GetPositionY(), item.GetPositionZ())
-        endif
-        if (!mcm.CurrentFlickerEnabled || !item.is3DLoaded() || pickedUp || (mcm.CurrentFlickerAmount > 0 && loopCount > mcm.CurrentFlickerAmount))
-            delete()
-            UnregisterForUpdate()
-            UnregisterForUpdateGameTime()
-            UnregisterForAllModEvents()
-            goToState("gone")
-        else 
-            explosionRef = placeAtMe(markerExplosion, 1)
-            loopCount = loopCount + 1
-        endIF    
-        RegisterForSingleUpdate(mcm.CurrentFlickerInterval)
-    endIF
+    Bool underFlickerAmount = (mcm.CurrentFlickerAmount > 0 && loopCount < mcm.CurrentFlickerAmount)
+    if (underFlickerAmount && mcm.CurrentFlickerEnabled && item != NONE  && item.is3DLoaded() && !pickedUp)
+        SetPosition(item.GetPositionX(), item.GetPositionY(), item.GetPositionZ())
+        explosionRef = placeAtMe(markerExplosion, 1)
+        loopCount = loopCount + 1
+    else
+        unregisterAll()
+    endIF    
+    RegisterForSingleUpdate(mcm.CurrentFlickerInterval)
 EndEvent
 
 
